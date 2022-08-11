@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Identity.Contracts.Requests;
+using Identity.Extensions;
 using Identity.Models;
 using Identity.Services;
 using Microsoft.AspNetCore.Identity;
@@ -64,7 +65,7 @@ namespace Identity.Controllers
                 }
                 else
                 {
-                    return Unauthorized(creation.Errors);
+                    return Unauthorized(this.ErrorResponse(creation.Errors));
                 }
 
             }
@@ -84,10 +85,10 @@ namespace Identity.Controllers
 
                 tokenService.GenerateToken(user, out string token);
 
-                return Ok(new { token });
+                return Ok(this.TokenResponse(token));
             }
 
-            return Unauthorized(new { message = "Invalid username or password" }); 
+            return Unauthorized(this.InvalidUsernameOrPassswordResponse()); 
         }
     }
 }
