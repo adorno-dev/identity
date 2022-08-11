@@ -1,4 +1,7 @@
+using System.Security.Claims;
 using Identity.Contracts.Requests;
+using Identity.Models;
+using Identity.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,13 +11,21 @@ namespace Identity.Controllers
     [ApiController]
     public class AuthenticationController : ControllerBase
     {
-        private readonly UserManager<IdentityUser> userManager;
-        private readonly SignInManager<IdentityUser> signInManager;
+        private readonly UserManager<UserModel> userManager;
+        private readonly SignInManager<UserModel> signInManager;
+        private readonly RoleManager<IdentityRole<Guid>> roleManager;
+        private readonly TokenService tokenService;
 
-        public AuthenticationController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager)
+        public AuthenticationController(
+            UserManager<UserModel> userManager,
+            SignInManager<UserModel> signInManager,
+            RoleManager<IdentityRole<Guid>> roleManager,
+            TokenService tokenService)
         {
             this.userManager = userManager;
             this.signInManager = signInManager;
+            this.roleManager = roleManager;
+            this.tokenService = tokenService;
         }
 
         [Route("signup")]
@@ -31,18 +42,31 @@ namespace Identity.Controllers
                     return BadRequest(ModelState.Values);
                 }
 
-                user = new IdentityUser 
+                user = new UserModel 
                 { 
                     UserName = request.Username, 
                     NormalizedUserName = request.Username?.ToUpper().Trim(),
-                    Email = request.Email 
+                    Email = request.Email,
+                    Birthday = request.Birthday,
+                    Fullname = request.Fullname,
+                    CPF = request.CPF
                 };
 
                 var creation = await userManager.CreateAsync(user, request.Password);
+                
+                if (creation.Succeeded)
+                {
+                    var birthdayClaim = new Claim(ClaimTypes.DateOfBirth, user.Birthday.ToShortDateString());
 
-                return creation.Succeeded ?
-                    Ok():
-                    BadRequest(creation.Errors);
+                    await userManager.AddClaimAsync(user, birthdayClaim);
+
+                    return Ok();
+                }
+                else
+                {
+                    return Unauthorized(creation.Errors);
+                }
+
             }
 
             return BadRequest();
@@ -52,22 +76,18 @@ namespace Identity.Controllers
         [HttpPost]
         public async Task<IActionResult> SignIn([FromBody] SignInRequest request)
         {
-            var validation = false;
+            var user = await userManager.FindByEmailAsync(request.Email);
 
-            if (ModelState.IsValid)
+            if (user is not null && await userManager.CheckPasswordAsync(user, request.Password))
             {
-                var user = await userManager.FindByNameAsync(request.Username);
-                
-                if (user is not null)
-                    validation = await userManager.CheckPasswordAsync(user, request.Password);
+                // await signInManager.PasswordSignInAsync(user, request.Password, false, false)
 
-                // if (user is not null)
-                //     validation = (await signInManager.PasswordSignInAsync(user, request.Password, false, false)).Succeeded;
+                tokenService.GenerateToken(user, out string token);
+
+                return Ok(new { token });
             }
 
-            return validation ?
-                Ok():
-                BadRequest(new { Message = "Invalid username or password" });
+            return Unauthorized(new { message = "Invalid username or password" }); 
         }
     }
 }
