@@ -3,6 +3,7 @@ using Identity.Extensions;
 using Identity.Models;
 using Identity.Policies;
 using Identity.Services;
+using Identity.Services.Contracts;
 using Identity.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -14,7 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 var tokenSettings = builder.Configuration.GetSection("TokenSettings").Get<TokenSettings>();
 
-builder.Services.Configure<TokenSettings>(builder.Configuration.GetSection("TokenSettings"));
+builder.Services.Configure<SendinBlueSettings>(builder.Configuration.GetSection(nameof(SendinBlueSettings)));
+
+builder.Services.Configure<TokenSettings>(builder.Configuration.GetSection(nameof(TokenSettings)));
 
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -31,12 +34,20 @@ builder.Services.AddIdentity<UserModel, IdentityRole<Guid>>(o =>
                     o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(3);
                     o.Lockout.MaxFailedAccessAttempts = 5;
                     o.Lockout.AllowedForNewUsers = true;
-                    o.SignIn.RequireConfirmedEmail = false;
+                    o.SignIn.RequireConfirmedEmail = true;
                     o.SignIn.RequireConfirmedPhoneNumber = false;
-                    o.SignIn.RequireConfirmedAccount = false;                   
+                    o.SignIn.RequireConfirmedAccount = true;                   
                 })
                 .AddEntityFrameworkStores<AppDbContext>()
                 .AddDefaultTokenProviders();
+
+builder.Services.UpgradePasswordSecurity()
+                .UseBcrypt<UserModel>();
+
+// builder.Services.Configure<PasswordHasherOptions>(options =>
+// {
+//     options.IterationCount = 320000;
+// });
 
 // builder.Services.AddAuthorization();
 
@@ -96,8 +107,8 @@ builder.Services.AddAuthorization(o =>
     });
 });
 
+builder.Services.AddSingleton<IEmailService, SendinBlueService>();
 builder.Services.AddSingleton<IAuthorizationHandler, AdultPolicyHandler>();
-
 builder.Services.AddScoped<TokenService>();
 
 builder.Services.AddControllers();

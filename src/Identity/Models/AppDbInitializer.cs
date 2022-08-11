@@ -1,4 +1,5 @@
 
+using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 
 namespace Identity.Models
@@ -39,11 +40,18 @@ namespace Identity.Models
             user.Birthday = new DateTime(1980, 01, 01);
             user.PhoneNumber = "00000000000";
             user.CPF = "00000000000";
+            user.EmailConfirmed = true;
 
             var creation = await userManager.CreateAsync(user, "Admin@2022");
 
             if (creation.Succeeded)
+            {
+                var birthdayClaim = new Claim(ClaimTypes.DateOfBirth, user.Birthday.ToShortDateString());
+                
                 await userManager.AddToRoleAsync(user, "admin");
+
+                await userManager.AddClaimAsync(user, birthdayClaim);
+            }
         }
     }
 }

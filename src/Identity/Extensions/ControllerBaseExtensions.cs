@@ -14,5 +14,7 @@ namespace Identity.Extensions
         public static object ErrorResponse(this ControllerBase ctl, IEnumerable<IdentityError> errors) => new ErrorResponse(errors);
 
         public static object UpdateUserResponse(this ControllerBase ctl, UserModel user) => new UpdateUserResponse(user.Id, user.Fullname, user.Birthday);
+
+        public static object SignUpResponse(this ControllerBase ctl) => new SignUpResponse("Check your email to confirm your account.");
     }
 }
